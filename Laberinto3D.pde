@@ -1,16 +1,23 @@
-// Main File: Laberinto3D.pde
+// -------------------
+// Laberinto3D.pde
+// -------------------
+boolean hasWon = false;
 
 void setup() {
   size(600, 600, P3D);
   noSmooth();
 
-  // Inicializar/generar el laberinto dinámicamente
+  // Generar laberinto
   setupMaze();
+
+  // IMPORTANTE: Inicializa la posición del jugador 
+  // después de generar el laberinto, para que no sea null:
+  resetPlayer();
 }
 
 void draw() {
   background(50);
-
+  
   setupCamera();
   lights();
 
@@ -25,8 +32,9 @@ void draw() {
 }
 
 void resetGame() {
-  resetPlayer();
   hasWon = false;
+  setupMaze(); 
+  resetPlayer(); 
 }
 
 void setupCamera() {
