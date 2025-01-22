@@ -165,30 +165,29 @@ void drawMaze() {
 
       // --- CASO 1: CELDA PARED (1) ---
       if (maze[row][col] == 1) {
-        fill(100, 100, 200);  // Pared normal
-        box(cellSize, cellSize, cellSize);
+        pushStyle(); // Asegura configuraciones locales
+        texturedBox(cellSize, wallImg); // Texturiza la pared
+        popStyle();
 
       // --- CASO 2: CELDA ES LA ENTRADA ---
       } else if (row == entranceRow && col == entranceCol) {
-        // Lámina roja vertical y delgada, sólida
-        fill(255, 0, 0);
-        // Para que parezca tapa en el lado externo, la movemos
-        // un poco en -Z (o +Z) para que no bloquee dentro.
+        pushStyle();
         pushMatrix();
-        // Por ejemplo, la movemos medio cellsize hacia atrás en Z:
-        translate(0, 0, -cellSize/2 + 1); 
-        box(cellSize, cellSize, 4);  // grosor 4
+        // Desplazamiento inicial antes de texturizar
+        translate(0, 0, -cellSize / 2 + 1); 
+        texturedBox(cellSize, portalEntry); // Texturiza la entrada
         popMatrix();
+        popStyle();
 
       // --- CASO 3: CELDA ES LA SALIDA ---
       } else if (row == exitRow && col == exitCol) {
-        // Lámina verde vertical y delgada, pero atravesable
-        fill(0, 255, 0);
+        pushStyle();
         pushMatrix();
-        // La movemos medio cellsize adelante en Z
-        translate(0, 0, cellSize/2 - 1);
-        box(cellSize, cellSize, 4);
+        // Desplazamiento inicial antes de texturizar
+        translate(0, 0, cellSize / 2 - 1);
+        texturedBox(cellSize, portalExit); // Texturiza la salida
         popMatrix();
+        popStyle();
 
       // --- CASO 4: CELDA LIBRE ---
       } else {
@@ -199,4 +198,64 @@ void drawMaze() {
       popMatrix();
     }
   }
+}
+
+// Función para dibujar un cubo texturizado
+void texturedBox(float size, PImage tex) {
+  float halfSize = size / 2;
+  noFill();
+  noStroke();
+  // Cara frontal
+  beginShape();
+  texture(tex);
+  vertex(-halfSize, -halfSize, halfSize, 0, 0);
+  vertex(halfSize, -halfSize, halfSize, tex.width, 0);
+  vertex(halfSize, halfSize, halfSize, tex.width, tex.height);
+  vertex(-halfSize, halfSize, halfSize, 0, tex.height);
+  endShape(CLOSE);
+
+  // Cara trasera
+  beginShape();
+  texture(tex);
+  vertex(halfSize, -halfSize, -halfSize, 0, 0);
+  vertex(-halfSize, -halfSize, -halfSize, tex.width, 0);
+  vertex(-halfSize, halfSize, -halfSize, tex.width, tex.height);
+  vertex(halfSize, halfSize, -halfSize, 0, tex.height);
+  endShape(CLOSE);
+
+  // Cara izquierda
+  beginShape();
+  texture(tex);
+  vertex(-halfSize, -halfSize, -halfSize, 0, 0);
+  vertex(-halfSize, -halfSize, halfSize, tex.width, 0);
+  vertex(-halfSize, halfSize, halfSize, tex.width, tex.height);
+  vertex(-halfSize, halfSize, -halfSize, 0, tex.height);
+  endShape(CLOSE);
+
+  // Cara derecha
+  beginShape();
+  texture(tex);
+  vertex(halfSize, -halfSize, halfSize, 0, 0);
+  vertex(halfSize, -halfSize, -halfSize, tex.width, 0);
+  vertex(halfSize, halfSize, -halfSize, tex.width, tex.height);
+  vertex(halfSize, halfSize, halfSize, 0, tex.height);
+  endShape(CLOSE);
+
+  // Cara superior
+  beginShape();
+  texture(tex);
+  vertex(-halfSize, -halfSize, -halfSize, 0, 0);
+  vertex(halfSize, -halfSize, -halfSize, tex.width, 0);
+  vertex(halfSize, -halfSize, halfSize, tex.width, tex.height);
+  vertex(-halfSize, -halfSize, halfSize, 0, tex.height);
+  endShape(CLOSE);
+
+  // Cara inferior
+  beginShape();
+  texture(tex);
+  vertex(-halfSize, halfSize, halfSize, 0, 0);
+  vertex(halfSize, halfSize, halfSize, tex.width, 0);
+  vertex(halfSize, halfSize, -halfSize, tex.width, tex.height);
+  vertex(-halfSize, halfSize, -halfSize, 0, tex.height);
+  endShape(CLOSE);
 }

@@ -75,9 +75,13 @@ void displayWinMessage() {
     hint(DISABLE_DEPTH_TEST);
     camera(); // Restaurar cámara por defecto para texto 2D
     textAlign(CENTER, CENTER);
-    fill(0, 255, 0);
+
+    pushStyle(); // Aislar configuraciones gráficas
+    fill(0, 255, 0); // Color verde para el texto
     textSize(48);
     text("¡HAS GANADO!", width / 2, height / 2);
+    popStyle(); // Restaurar configuraciones anteriores
+
     hint(ENABLE_DEPTH_TEST);
   } else {
     resetGame();

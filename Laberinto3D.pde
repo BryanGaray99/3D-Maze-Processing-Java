@@ -1,16 +1,23 @@
 // -------------------
 // Laberinto3D.pde
 // -------------------
-PImage wallImg;
 boolean hasWon = false;
+PImage wallImg;
+PImage portalEntry;
+PImage portalExit;
 
 void setup() {
   size(600, 600, P3D);
-  wallImg = loadImage("wall-2.jpg");
   noSmooth();
+  wallImg = loadImage("wall-2.jpg");
+  portalEntry = loadImage("portalEntry.jpg");
+  portalExit = loadImage("portalExit.jpg");
 
   // Generar laberinto
   setupMaze();
+
+  // IMPORTANTE: Inicializa la posición del jugador 
+  // después de generar el laberinto, para que no sea null:
   resetPlayer();
 }
 
