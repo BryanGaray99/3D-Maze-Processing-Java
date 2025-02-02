@@ -11,10 +11,6 @@
  *   - Mantener BFS optimizado y lógica de sectores para parches.
  *   - Evitar recargar parches si el nivel no ha cambiado.
  *
- * Notas:
- *   - Se asume que en el archivo principal (Laberinto3D.pde) se declaran:
- *       PImage wallImg, portalEntry, portalExit;
- *     y se cargan en setup().
  */
 
 import java.util.ArrayList;
