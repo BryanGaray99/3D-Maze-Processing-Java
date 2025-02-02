@@ -1,16 +1,30 @@
 /**
  * Maze.pde
  *
- * Niveles:
- *   1 => 5x5
- *   2 => 15x15
- *   3 => 25x25
+ * Este archivo se encarga de la generación, validación y renderizado del laberinto 3D.
+ * Las dimensiones del laberinto se determinan en función del nivel seleccionado:
+ *   - Nivel 1: 5x5 celdas.
+ *   - Nivel 2: 15x15 celdas.
+ *   - Nivel 3: 25x25 celdas.
  *
- * Objetivos:
- *   - Cargar SOLO la cantidad de imágenes necesaria (no exceder).
- *   - Mantener BFS optimizado y lógica de sectores para parches.
- *   - Evitar recargar parches si el nivel no ha cambiado.
+ * Optimización y funcionamiento:
+ *   - La generación del laberinto se realiza mediante un algoritmo DFS (búsqueda en profundidad)
+ *     que excava pasillos en un espacio inicialmente lleno de paredes.
+ *   - Se emplea un algoritmo BFS optimizado para validar la conectividad entre la entrada y la salida,
+ *     utilizando una matriz preasignada (visitedBFS) y arreglos de enteros para la cola.
+ *   - El renderizado del laberinto se efectúa en 3D, utilizando un PShape preconstruido para representar
+ *     las paredes, reduciendo la sobrecarga de llamadas a beginShape()/endShape().
+ *   - La asignación de "parches" (imágenes) a las paredes se organiza mediante una lógica de sectores.
+ *     De las 25 imágenes precargadas globalmente (en patchPoolGlobal, cargadas en un hilo secundario
+ *     en Laberinto3D.pde), se utiliza un subconjunto: las primeras 5 para un laberinto de 5x5, las primeras
+ *     15 para un laberinto de 15x15, o las 25 para un laberinto de 25x25.
+ *   - Estas optimizaciones permiten que, tras finalizar una partida y reiniciar, el laberinto se
+ *     genere y se renderice de forma rápida, evitando recargas innecesarias de imágenes.
  *
+ * Se espera que las siguientes variables globales se declaren en el archivo principal:
+ *   - PImage wallImg, portalEntry, portalExit
+ * Además, se utiliza la variable global patchPoolGlobal[] y la bandera patchLoadComplete, las cuales
+ * se inicializan en Laberinto3D.pde al arrancar la aplicación.
  */
 
 import java.util.ArrayList;
@@ -19,7 +33,7 @@ import java.util.Queue;
 import java.util.Collections;
 
 // -----------------------------------------------------------------------------
-// Parámetros y variables globales
+// Parámetros y variables locales para Maze
 // -----------------------------------------------------------------------------
 
 int mazeRows = 5;
@@ -32,31 +46,14 @@ int entranceCol = 1;
 int exitRow;
 int exitCol;
 
-/** Para cada pared (r,c) que tenga parche, guarda la imagen. */
+// Matriz de colores y parches
+color[][] wallColors;
 PImage[][] patchImages;
 
-/** Matriz de colores (referencia). */
-color[][] wallColors;
-
-/** BFS optimizado: matriz global para "visitado". */
+// BFS optimizado
 boolean[][] visitedBFS;
 
-/** 
- * Pool de imágenes para parches. 
- * Se dimensiona según el nivel elegido (5, 15 o 25).
- */
-PImage[] patchPool = null; 
-
-/** Tamaño actual del pool (cuántas imágenes se cargaron). */
-int patchPoolSize = 0;
-
-/** Nivel anterior para detectar si cambió el nivel y recargar parches si hace falta. */
-int lastLevelLoaded = -1;
-
-/** 
- * PShape de la pared con textura (cubo),
- * para no hacer `beginShape()/endShape()` repetidamente.
- */
+// PShape de la pared con textura
 PShape wallShape = null;
 
 // -----------------------------------------------------------------------------
@@ -64,61 +61,43 @@ PShape wallShape = null;
 // -----------------------------------------------------------------------------
 
 void setMazeSizeFromLevel() {
+  // Se asume: 1 => 5x5, 2 => 15x15, 3 => 25x25
   switch(selectedLevel) {
-    case 1:
-      // nivel fácil => 5x5
-      mazeRows = 5;
+    case 1: 
+      mazeRows = 5; 
       mazeCols = 5;
       break;
     case 2:
-      // nivel medio => 15x15
-      mazeRows = 15;
+      mazeRows = 15; 
       mazeCols = 15;
       break;
     case 3:
-      // nivel difícil => 25x25
-      mazeRows = 25;
+      mazeRows = 25; 
       mazeCols = 25;
       break;
     default:
-      mazeRows = 5;
+      mazeRows = 5; 
       mazeCols = 5;
   }
 }
 
 // -----------------------------------------------------------------------------
-// Función auxiliar: Retorna cuántas imágenes "parche" precargar según el tamaño
-// -----------------------------------------------------------------------------
-
-int computePatchPoolSize() {
-  // Aquí decides la cantidad justa:
-  // - 5x5 => 5 imágenes
-  // - 15x15 => 15 imágenes
-  // - 25x25 => 25 imágenes
-  // Ajusta si deseas un criterio distinto
-  if (mazeRows == 5 && mazeCols == 5) return 5;
-  if (mazeRows == 15 && mazeCols == 15) return 15;
-  if (mazeRows == 25 && mazeCols == 25) return 25;
-  return 5; // fallback
-}
-
-// -----------------------------------------------------------------------------
-// Inicialización del laberinto
+// Inicializar Maze
 // -----------------------------------------------------------------------------
 
 void setupMaze() {
   println("[MAZE] setupMaze() => INICIO en " + millis() + " ms");
 
-  // 1. Ajustar filas y columnas según el nivel
+  // 1. Ajustar tamaño
   setMazeSizeFromLevel();
 
-  // 2. Crear visitedBFS antes de BFS (evita NullPointer)
+  // 2. Preparar la matriz visitedBFS antes de BFS
   visitedBFS = new boolean[mazeRows][mazeCols];
 
-  // 3. Generar y validar el laberinto (usa BFS)
+  // 3. Generar y validar
   generateAndValidateMaze();
 
-  // 4. Inicializar matrices de colores y parches
+  // 4. Inicializar wallColors y patchImages
   wallColors  = new color[mazeRows][mazeCols];
   patchImages = new PImage[mazeRows][mazeCols];
   for (int r = 0; r < mazeRows; r++) {
@@ -128,46 +107,36 @@ void setupMaze() {
     }
   }
 
-  // 5. Crear el PShape de pared (una sola vez, si aún no existe)
+  // 5. PShape de pared (solo una vez)
   if (wallShape == null) {
     wallShape = createWallShape(wallImg, cellSize);
   }
 
-  // 6. Cargar SOLO la cantidad de imágenes necesaria para este nivel
-  int needed = computePatchPoolSize();
+  int needed = 5; 
+  if (mazeRows == 15) needed = 15;
+  if (mazeRows == 25) needed = 25;
+  println("[MAZE] -> usaremos " + needed + " de las 25 imágenes globales.");
 
-  // Revisar si ya cargamos las imágenes para este nivel (o sea, si lastLevelLoaded == selectedLevel).
-  // Si el nivel cambió, o no hay patchPool, o su tamaño difiere => recargamos.
-  if (selectedLevel != lastLevelLoaded || patchPool == null || patchPoolSize != needed) {
-    println("[MAZE] -> Se requiere cargar parches para el nivel " + selectedLevel + " ...");
-    patchPoolSize = needed;
-    patchPool = new PImage[patchPoolSize];
-    preloadPatchImages();
-    lastLevelLoaded = selectedLevel;
-  } else {
-    println("[MAZE] -> Ya teníamos parches cargados para este nivel (" + selectedLevel + "); no recargamos.");
-  }
-
-  // 7. Detectar paredes y asignar parches
-  detectColoredWalls();
+  // 7. Llamar a detectColoredWalls (que pondrá parches en patchImages[][])
+  detectColoredWalls(needed);
 
   println("[MAZE] setupMaze() => FIN en " + millis() + " ms");
 }
 
 // -----------------------------------------------------------------------------
-// Generación y validación del laberinto
+// Generación y Validación
 // -----------------------------------------------------------------------------
 
 void generateAndValidateMaze() {
   println("[MAZE] generateAndValidateMaze() => INICIO en " + millis() + " ms");
 
   boolean valid = false;
-  int attempts  = 0;
+  int attempts = 0;
   while (!valid) {
     attempts++;
     generateMaze();
 
-    // Forzamos que entrada y salida sean libres
+    // Forzar entrada y salida libres
     maze[entranceRow][entranceCol] = 0;
     maze[exitRow][exitCol] = 0;
 
@@ -182,11 +151,11 @@ void generateAndValidateMaze() {
     }
   }
 
-  println("[MAZE] Maze válido tras " + attempts + " intentos. Imprimiendo matriz:");
+  println("[MAZE] Maze valido tras " + attempts + " intentos:");
   for (int r = 0; r < mazeRows; r++) {
     String rowStr = "";
     for (int c = 0; c < mazeCols; c++) {
-      rowStr += (maze[r][c] + " ");
+      rowStr += maze[r][c] + " ";
     }
     println(rowStr);
   }
@@ -194,9 +163,9 @@ void generateAndValidateMaze() {
   println("[MAZE] generateAndValidateMaze() => FIN en " + millis() + " ms");
 }
 
-// Genera todo paredes y "cava" con DFS
 void generateMaze() {
   println("[MAZE] generateMaze() => INICIO en " + millis() + " ms");
+
   maze = new int[mazeRows][mazeCols];
   for (int r = 0; r < mazeRows; r++) {
     for (int c = 0; c < mazeCols; c++) {
@@ -214,9 +183,6 @@ void generateMaze() {
   println("[MAZE] generateMaze() => FIN en " + millis() + " ms");
 }
 
-/**
- * DFS recursivo para "cavar" pasillos.
- */
 void dfsCarve(int row, int col) {
   int[] dirs = {0, 1, 2, 3};
   shuffleArray(dirs);
@@ -241,7 +207,7 @@ void dfsCarve(int row, int col) {
 }
 
 // -----------------------------------------------------------------------------
-// BFS optimizado con matriz global visitedBFS
+// BFS optimizado
 // -----------------------------------------------------------------------------
 
 boolean isConnectedBFS(int sr, int sc, int er, int ec) {
@@ -254,6 +220,7 @@ boolean isConnectedBFS(int sr, int sc, int er, int ec) {
   int front = 0;
   int back  = 0;
 
+  // Encolar inicio
   queueR[back] = sr;
   queueC[back] = sc;
   back++;
@@ -305,30 +272,22 @@ void shuffleArray(int[] arr) {
 }
 
 // -----------------------------------------------------------------------------
-// Precarga de parches (imagenes de picsum), SOLO la cantidad necesaria
+// Detección de Paredes y Asignación de Parches
 // -----------------------------------------------------------------------------
 
-void preloadPatchImages() {
-  println("[MAZE] preloadPatchImages() => INICIO en " + millis() + " ms");
-  for (int i = 0; i < patchPoolSize; i++) {
-    // Añadimos ?seed para forzar imágenes diferentes
-    String url = "https://picsum.photos/200.jpg?seed=" + i;
-    patchPool[i] = loadImage(url);
-    println("[MAZE]   -> patchPool[" + i + "] desde " + url);
-  }
-  println("[MAZE] preloadPatchImages() => FIN en " + millis() + " ms");
-}
-
-// -----------------------------------------------------------------------------
-// Deteccion de paredes para parches (lógica de sectores)
-// -----------------------------------------------------------------------------
-
-void detectColoredWalls() {
+/**
+ * Este método asigna imágenes (parches) a las paredes del laberinto utilizando una
+ * estrategia de particionamiento en sectores y subsectores. De las 25 imágenes precargadas
+ * globalmente (patchPoolGlobal), se utiliza un subconjunto determinado por el parámetro
+ * 'needed' (5 para 5x5, 15 para 15x15 o 25 para 25x25).
+ *
+ * @param needed Número de imágenes globales a considerar para asignar parches.
+ */
+void detectColoredWalls(int needed) {
   println("[MAZE] detectColoredWalls() => INICIO en " + millis() + " ms");
   long startTime = millis();
 
-  // Mantén tu lógica de sectores:
-  // (ejemplo con 2 sectores si >=15, 3 si >=25, etc. Ajusta a gusto)
+  // Lógica de sectores (2 si >=15, 3 si >=25, etc.)
   int numSectors = 1;
   if (mazeRows >= 15) numSectors = 2;
   if (mazeRows >= 25) numSectors = 3;
@@ -336,15 +295,12 @@ void detectColoredWalls() {
   int sectorHeight = mazeRows / numSectors;
   int sectorWidth  = mazeCols / numSectors;
 
-  // Divisiones internas
   int subDivRows = 2;
   int subDivCols = 4;
 
-  // Direcciones para buscar paredes adyacentes
   int[][] deltas = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
   int totalPatchesPlaced = 0;
 
-  // Recorrer cada sector
   for (int i = 0; i < numSectors; i++) {
     for (int j = 0; j < numSectors; j++) {
       int sector_r_min = i * sectorHeight;
@@ -367,13 +323,13 @@ void detectColoredWalls() {
 
           boolean patchPlaced = false;
 
-          // 1) Ver si la celda central es libre, y si hay pared adyacente
+          // 1) Celda central libre => mirar paredes vecinas
           if (isInside(centerR, centerC) && maze[centerR][centerC] == 0) {
             for (int d = 0; d < 4; d++) {
               int nr = centerR + deltas[d][0];
               int nc = centerC + deltas[d][1];
               if (isInside(nr, nc) && maze[nr][nc] == 1 && patchImages[nr][nc] == null) {
-                patchImages[nr][nc] = getRandomPatchImage();
+                patchImages[nr][nc] = getRandomPatchFromGlobal(needed);
                 totalPatchesPlaced++;
                 patchPlaced = true;
                 break;
@@ -381,7 +337,7 @@ void detectColoredWalls() {
             }
           }
 
-          // 2) Si no se logró, busca en un radio pequeño
+          // 2) Radio pequeño si no se pudo
           if (!patchPlaced) {
             int radius = 2;
             outer:
@@ -392,7 +348,7 @@ void detectColoredWalls() {
                     int xr = rr + deltas[d][0];
                     int xc = cc + deltas[d][1];
                     if (isInside(xr, xc) && maze[xr][xc] == 1 && patchImages[xr][xc] == null) {
-                      patchImages[xr][xc] = getRandomPatchImage();
+                      patchImages[xr][xc] = getRandomPatchFromGlobal(needed);
                       totalPatchesPlaced++;
                       patchPlaced = true;
                       break outer;
@@ -408,16 +364,27 @@ void detectColoredWalls() {
   }
 
   long elapsed = millis() - startTime;
-  println("[MAZE] detectColoredWalls() => Se colocaron " + totalPatchesPlaced + " parches en " + elapsed + " ms");
+  println("[MAZE] detectColoredWalls() => Se colocaron " + totalPatchesPlaced + " parches. Tiempo: " + elapsed + " ms");
 }
 
-// Retorna una imagen aleatoria de las precargadas
-PImage getRandomPatchImage() {
-  if (patchPool == null || patchPoolSize <= 0) {
-    return null; // fallback, por seguridad
+/**
+ * Selecciona aleatoriamente una imagen del subconjunto de las 'needed' primeras imágenes
+ * del pool global (patchPoolGlobal). Se garantiza que 'needed' se encuentra entre 1 y 25.
+ *
+ * @param needed Número de imágenes del pool global a considerar.
+ * @return Una imagen seleccionada aleatoriamente o null si no están disponibles.
+ */
+PImage getRandomPatchFromGlobal(int needed) {
+  if (!patchLoadComplete) {
+    // Si el hilo no terminó, devolvemos null o un fallback
+    println("[MAZE] WARNING: Los parches globales no están listos. Devolviendo null.");
+    return null;
   }
-  int idx = int(random(patchPoolSize));
-  return patchPool[idx];
+  if (needed < 1) needed = 1; // seguridad
+  if (needed > 25) needed = 25;
+
+  int idx = int(random(needed)); // 0 .. needed-1
+  return patchPoolGlobal[idx];
 }
 
 boolean isInside(int rr, int cc) {
@@ -444,7 +411,7 @@ void drawMaze() {
         // Pared
         shape(wallShape);
 
-        // Si hay parche en la cara frontal
+        // Poner parche si existe
         if (patchImages[r][c] != null) {
           pushMatrix();
           translate(0, 0, -cellSize / 2 - 0.1);
@@ -472,12 +439,10 @@ void drawMaze() {
   }
 
   popMatrix();
-  long elapsedDraw = millis() - startDraw;
-  println("[MAZE] drawMaze() => Completado en " + elapsedDraw + " ms");
 }
 
 // -----------------------------------------------------------------------------
-// Creación de PShape (cubo con textura) para paredes
+// Crear un PShape (cubo con textura) para las paredes
 // -----------------------------------------------------------------------------
 
 PShape createWallShape(PImage tex, float size) {
@@ -528,7 +493,7 @@ PShape createWallShape(PImage tex, float size) {
 }
 
 // -----------------------------------------------------------------------------
-// Dibujo de portales
+// Dibujo del portal
 // -----------------------------------------------------------------------------
 
 void drawPortal(boolean isExit) {

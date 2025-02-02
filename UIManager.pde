@@ -100,7 +100,7 @@ void drawSelectLevelMenu() {
     textAlign(CENTER, CENTER);
     fill(255);
     textSize(32);
-    text("Selecciona un nivel :)", width/2, 100);
+    text("Selecciona un nivel :", width/2, 100);
 
     float bw = 550, bh = 60;
     float bx = width/2 - bw/2;
@@ -127,7 +127,7 @@ void drawEnterNameScreen() {
     textAlign(CENTER, CENTER);
     fill(255);
     textSize(32);
-    text("Ingresa tu apodo de gamer :)", width/2, 120);
+    text("Ingresa tu apodo de gamer :", width/2, 120);
 
     // Caja de texto
     float tw = 300, th = 50;
@@ -161,7 +161,7 @@ void drawScoresScreen() {
     textAlign(LEFT, CENTER);
     fill(255);
     textSize(36);
-    text("Mejores Tiempos :)", 50, 50);
+    text("Mejores Tiempos :", 50, 50);
 
     int yStart = 120, yOffset = 30;
 

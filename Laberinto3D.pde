@@ -17,6 +17,7 @@
  * El sistema tambien maneja el cronometro durante la partida, la deteccion de victoria
  * y la transicion entre pantallas de manera ordenada.
  */
+
 import java.util.Collections;
 import java.util.List;
 
@@ -67,6 +68,16 @@ PImage portalEntry;
 /** Textura asociada al portal de salida. */
 PImage portalExit;
 
+
+// -----------------------------------------------------------------------------
+// POOL GLOBAL de 25 imágenes de parches cargadas en un hilo secundario
+// -----------------------------------------------------------------------------
+
+final int MAX_PATCHES = 25;  
+PImage[] patchPoolGlobal = new PImage[MAX_PATCHES];
+// Indicador para saber si el hilo terminó de cargar
+boolean patchLoadComplete = false;
+
 /**
  * Iniciamos el entorno de Processing en modo P3D, ajusta el tamano de la ventana
  * y desactiva el suavizado. Ademas, procede a cargar las texturas base (pared y portales),
@@ -76,6 +87,7 @@ void setup() {
   size(800, 600, P3D);
   noSmooth();
 
+  // Cargamos texturas base
   wallImg     = loadImage("wall-2.jpg");
   portalEntry = loadImage("portalEntry.jpg");
   portalExit  = loadImage("portalExit.jpg");
@@ -84,17 +96,37 @@ void setup() {
   loadScores();
 
   println("[SETUP] gameState=0 (Menu principal)");
+
+  // Iniciamos el hilo secundario para cargar 25 parches
+  startPatchLoaderThread();
+}
+
+/**
+ * Hilo secundario que carga 25 imágenes en patchPoolGlobal[] para usarlas en Maze.
+ */
+void startPatchLoaderThread() {
+  Thread loader = new Thread(new Runnable() {
+    public void run() {
+      println("[THREAD] Iniciando carga en hilo secundario de " + MAX_PATCHES + " parches...");
+      for (int i = 0; i < MAX_PATCHES; i++) {
+        String url = "https://picsum.photos/200.jpg?seed=" + i;
+        patchPoolGlobal[i] = loadImage(url);
+        println("[THREAD] Cargada la imagen " + i + " desde: " + url);
+      }
+      patchLoadComplete = true;
+      println("[THREAD] ¡Terminada la carga de 25 parches en segundo plano!");
+    }
+  });
+  loader.start();
 }
 
 /**
  * El Draw forma parte del bucle principal de Processing. Evalua el estado del juego
  * y decide que se dibuja en cada fotograma:
- * <ul>
- *   <li>Menus e interfaces (estados 0,1,2,5,7) se renderizan en 2D.</li>
- *   <li>La accion del laberinto (estado 3) se dibuja en 3D.</li>
- *   <li>La pantalla final (estado 4) muestra el tiempo total.</li>
- *   <li>La pantalla de carga (estado 6) exhibe una animacion temporal.</li>
- * </ul>
+ *   Menus e interfaces (estados 0,1,2,5,7) se renderizan en 2D.
+ *   La accion del laberinto (estado 3) se dibuja en 3D.
+ *   La pantalla final (estado 4) muestra el tiempo total.
+ *   La pantalla de carga (estado 6) exhibe una animacion temporal.
  */
 void draw() {
   // Alterna el fondo en funcion de si se esta o no dentro del laberinto
@@ -192,13 +224,21 @@ void drawFinishTime() {
 /**
  * Reinicia las variables clave de la partida. Genera un nuevo laberinto
  * y posiciona al jugador en la entrada, asegurandose de dejar hasWon en falso.
+ *
+ * Tambien reinicia los flags de movimiento para evitar que
+ * el jugador se deslice solo al reiniciar.
  */
 void resetGame() {
   hasWon = false;
-  up    = false;
-  down  = false;
+
+  // Reestablecemos controles
+  up          = false;
+  down        = false;
   strafeLeft  = false;
   strafeRight = false;
+  turnLeft = false;
+  turnRight = false;
+
   println("[RESET] setupMaze + resetPlayer");
   setupMaze();
   resetPlayer();
@@ -253,9 +293,9 @@ void drawLoadingScreen() {
   // Instrucciones mínimas con estilo aislado
   pushStyle();
   textAlign(CENTER, CENTER);
-  fill(255);            // Texto en negro
-  textSize(22);       // Tamaño de fuente más grande
-  float instructionsY = (height / 2) + 150;  // 100 px más abajo
+  fill(255);
+  textSize(22);
+  float instructionsY = (height / 2) + 150;
   text(
     "Controles:\n" +
     "• Flechas: ↑ Adelante, ↓ Atras, ← Izq, → Der\n" +
