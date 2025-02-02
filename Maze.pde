@@ -1,28 +1,47 @@
-// -------------------
-// Maze.pde
-// -------------------
+/**
+ * Maze.pde administra la generacion, validacion y dibujo del laberinto
+ * en 3D. Define las dimensiones segun el nivel seleccionado, genera el trazado de
+ * celdas libres y paredes, y situa un portal de entrada y otro de salida.
+ *
+ * Tambien introduce un sistema de "parches" que se traducen en imagenes random
+ * obtenidas de https://picsum.photos/200.jpg, las cuales se ubican en paredes
+ * seleccionadas mediante un algoritmo de sectorizado, el fin de estos parches
+ * es dar pistas al usuario de su ubicación en el laberinto.
+ */
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Collections;
 
+/** Numero de filas que tendra el laberinto. */
 int mazeRows = 16;
+/** Numero de columnas que tendra el laberinto. */
 int mazeCols = 16;
+/** Tamano en pixeles que representara cada celda del laberinto. */
 int cellSize = 40;
 
-// 1 = Pared, 0 = Libre
+/** Matriz que almacena 1 para paredes y 0 para celdas libres. */
 int[][] maze;
 
+/** Fila que marca la entrada del laberinto. */
 int entranceRow = 0;
+/** Columna que marca la entrada del laberinto. */
 int entranceCol = 1;
+/** Fila que marca la salida del laberinto. */
 int exitRow;
+/** Columna que marca la salida del laberinto. */
 int exitCol;
 
-// Matriz de color para "parches"
+/** Matriz para guardar la imagen de cada "parche" cuando corresponde a una pared. */
+PImage[][] patchImages;
+
+/** Matriz de colores para asignaciones antiguas (se deja como referencia). */
 color[][] wallColors;
 
-/** Ajusta mazeRows/mazeCols según selectedLevel. 
-    Llamada al generar el laberinto. */
+/**
+ * Ajustamos la cantidad de filas y columnas del laberinto
+ * segun el nivel seleccionado. Se invoca antes de generar el laberinto.
+ */
 void setMazeSizeFromLevel() {
   switch(selectedLevel) {
     case 1:
@@ -39,28 +58,54 @@ void setMazeSizeFromLevel() {
   }
 }
 
-/** Genera y valida el laberinto, luego coloca los parches de color */
+/**
+ * Invocamos al comenzar una partida o al reiniciar el juego. Configura las dimensiones
+ * segun el nivel, genera el laberinto y prepara tanto la matriz de colores como
+ * la de imagenes. Finalmente llama a detectColoredWalls() para situar los "parches".
+ */
 void setupMaze() {
   println("[MAZE] setupMaze() => Empezar generacion");
-  
-  // Ajustar tamaño según el nivel
+
+  // Ajuste del tamano del laberinto en funcion del nivel
   setMazeSizeFromLevel();
-  
+
+  // Generacion del trazado y posterior validacion
   generateAndValidateMaze();
-  
+
+  // Inicializa ambas matrices: wallColors y patchImages
+  wallColors = new color[mazeRows][mazeCols];
+  patchImages = new PImage[mazeRows][mazeCols];
+  for (int r = 0; r < mazeRows; r++) {
+    for (int c = 0; c < mazeCols; c++) {
+      wallColors[r][c] = color(0, 0);
+      patchImages[r][c] = null;
+    }
+  }
+
+  // Llama al metodo que localiza y coloca parches de imagen
   detectColoredWalls();
 }
 
-/** Retorna true si (rr,cc) está dentro de la matriz */
+/**
+ * Verificamos si las coordenadas (rr, cc) se encuentran dentro de los limites del laberinto.
+ *
+ * @param rr indice de fila
+ * @param cc indice de columna
+ * @return true si rr, cc se ubican dentro de la matriz
+ */
 boolean isInside(int rr, int cc) {
   return (rr >= 0 && rr < mazeRows && cc >= 0 && cc < mazeCols);
 }
 
+/**
+ * Generamos el laberinto y comprueba que exista un camino entre
+ * la entrada y la salida. Repite la generacion hasta que sea valido.
+ */
 void generateAndValidateMaze() {
   boolean valid = false;
   while (!valid) {
     generateMaze();
-    // Forzar entrada y salida
+    // Fuerza que entrada y salida sean celdas libres
     maze[entranceRow][entranceCol] = 0;
     maze[exitRow][exitCol] = 0;
     valid = isConnectedBFS(entranceRow, entranceCol, exitRow, exitCol);
@@ -68,7 +113,7 @@ void generateAndValidateMaze() {
       println("[MAZE] BFS => no hay camino, regenerando...");
     }
   }
-  println("[MAZE] Maze válido! Imprimiendo matriz:");
+  println("[MAZE] Maze valido! Imprimiendo matriz:");
   for (int r = 0; r < mazeRows; r++) {
     String rowStr = "";
     for (int c = 0; c < mazeCols; c++) {
@@ -79,21 +124,35 @@ void generateAndValidateMaze() {
   println("--------------------");
 }
 
+/**
+ * Generamos la matriz del laberinto, inicializando todas las celdas como paredes (1),
+ * y luego ejecuta un proceso DFS para cavar senderos en celdas libres (0).
+ * Tambien asigna aleatoriamente la ubicacion de la salida en la ultima fila.
+ */
 void generateMaze() {
   println("[MAZE] Generar Maze de " + mazeRows + " x " + mazeCols);
   maze = new int[mazeRows][mazeCols];
   for (int r = 0; r < mazeRows; r++) {
     for (int c = 0; c < mazeCols; c++) {
-      maze[r][c] = 1;  // inicialmente, todo son paredes
+      maze[r][c] = 1;  // Comienza con todo paredes
     }
   }
   exitRow = mazeRows - 1;
   exitCol = int(random(1, mazeCols - 1));
-  
+
+  // Punto de partida para el DFS
   maze[1][1] = 0;
   dfsCarve(1, 1);
 }
 
+/**
+ * Realizamos el tallado del laberinto mediante un DFS recursivo.
+ * En cada paso, elige un orden aleatorio de direcciones y abre camino
+ * si la nueva celda es pared, creando pasillos.
+ *
+ * @param row fila actual
+ * @param col columna actual
+ */
 void dfsCarve(int row, int col) {
   int[] dirs = {0, 1, 2, 3};
   shuffleArray(dirs);
@@ -108,6 +167,7 @@ void dfsCarve(int row, int col) {
     if (nr > 0 && nr < mazeRows - 1 && nc > 0 && nc < mazeCols - 1) {
       if (maze[nr][nc] == 1) {
         maze[nr][nc] = 0;
+        // Se abre el muro intermedio entre (row, col) y (nr, nc)
         maze[(row + nr) / 2][(col + nc) / 2] = 0;
         dfsCarve(nr, nc);
       }
@@ -115,18 +175,28 @@ void dfsCarve(int row, int col) {
   }
 }
 
+/**
+ * Empleamos un recorrido BFS para verificar si hay conexion entre la posicion
+ * de entrada (sr, sc) y la de salida (er, ec).
+ *
+ * @param sr fila de inicio
+ * @param sc columna de inicio
+ * @param er fila de destino
+ * @param ec columna de destino
+ * @return true si se encuentra un camino libre entre entrada y salida
+ */
 boolean isConnectedBFS(int sr, int sc, int er, int ec) {
   if (maze[sr][sc] == 1 || maze[er][ec] == 1) return false;
   boolean[][] visited = new boolean[mazeRows][mazeCols];
   int[] queueR = new int[mazeRows * mazeCols];
   int[] queueC = new int[mazeRows * mazeCols];
   int front = 0, back = 0;
-  
+
   queueR[back] = sr;
   queueC[back] = sc;
   back++;
   visited[sr][sc] = true;
-  
+
   int[] dr = {-1, 1, 0, 0};
   int[] dc = {0, 0, -1, 1};
 
@@ -151,6 +221,13 @@ boolean isConnectedBFS(int sr, int sc, int er, int ec) {
   return false;
 }
 
+/**
+ * Mezclamos aleatoriamente los elementos de un arreglo de enteros,
+ * utilizando swaps sobre indices aleatorios, para lograr variedad
+ * en la direccion del tallado DFS.
+ *
+ * @param arr arreglo de direcciones que se va a reordenar
+ */
 void shuffleArray(int[] arr) {
   for (int i = arr.length - 1; i > 0; i--) {
     int idx = (int)random(i + 1);
@@ -161,79 +238,65 @@ void shuffleArray(int[] arr) {
 }
 
 /**
- * Detecta y coloca los parches de color de forma estratégica.
- * La estrategia consiste en dividir el laberinto en sectores según su tamaño y
- * en cada sector ubicar, preferentemente cerca del centro, un parche en una pared adyacente a una celda libre.
+ * Exploramos el laberinto para ubicar posibles paredes donde colocar
+ * imagenes aleatorias (en lugar de un parche de color). Aplica
+ * una estrategia de sectorizado para distribuir dichas imagenes.
  */
 void detectColoredWalls() {
-  println("[MAZE] detectColoredWalls() => Estrategia de sectorización 2x4 por sector (8 parches por sector)");
-  
-  // Inicializar la matriz de colores sin parches.
-  wallColors = new color[mazeRows][mazeCols];
-  for (int r = 0; r < mazeRows; r++) {
-    for (int c = 0; c < mazeCols; c++) {
-      wallColors[r][c] = color(0, 0); // Sin color
-    }
-  }
-  
-  // Determinar el número de sectores según el tamaño del laberinto.
-  // Por ejemplo: para 15x15 se usan 2, para 25x25: 3, para 35x35: 4 sectores por dimensión.
+  println("[MAZE] detectColoredWalls() => Estrategia sectorizada para colocar imagenes aleatorias");
+
   int numSectors = 2;
   if (mazeRows >= 25) numSectors = 3;
   if (mazeRows >= 35) numSectors = 4;
-  
+
   int sectorHeight = mazeRows / numSectors;
   int sectorWidth  = mazeCols / numSectors;
-  
-  // Definir la subdivisión interna: para 8 parches por sector, usamos 2 filas y 4 columnas.
+
   int subDivRows = 2;
   int subDivCols = 4;
-  
-  // Predefinir desplazamientos para vecinos (arriba, abajo, izquierda, derecha).
+
+  // Direcciones de vecindad vertical/horizontal
   int[][] deltas = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
-  
+
   int totalPatchesPlaced = 0;
-  
-  // Iterar por cada sector.
+
   for (int i = 0; i < numSectors; i++) {
     for (int j = 0; j < numSectors; j++) {
       int sector_r_min = i * sectorHeight;
       int sector_r_max = (i == numSectors - 1) ? mazeRows - 1 : (i + 1) * sectorHeight - 1;
       int sector_c_min = j * sectorWidth;
       int sector_c_max = (j == numSectors - 1) ? mazeCols - 1 : (j + 1) * sectorWidth - 1;
-      
-      // Dividir cada sector en subDivRows x subDivCols sub-sectores.
+
       int subSectorHeight = max(1, (sector_r_max - sector_r_min + 1) / subDivRows);
       int subSectorWidth  = max(1, (sector_c_max - sector_c_min + 1) / subDivCols);
-      
-      // Iterar en cada sub-sector (total subDivRows * subDivCols = 8 por sector).
+
       for (int subRow = 0; subRow < subDivRows; subRow++) {
         for (int subCol = 0; subCol < subDivCols; subCol++) {
           int sub_r_min = sector_r_min + subRow * subSectorHeight;
           int sub_r_max = (subRow == subDivRows - 1) ? sector_r_max : sub_r_min + subSectorHeight - 1;
           int sub_c_min = sector_c_min + subCol * subSectorWidth;
           int sub_c_max = (subCol == subDivCols - 1) ? sector_c_max : sub_c_min + subSectorWidth - 1;
-          
+
           int centerR = (sub_r_min + sub_r_max) / 2;
           int centerC = (sub_c_min + sub_c_max) / 2;
-          
+
           boolean patchPlaced = false;
-          
-          // Intentar colocar un parche usando la celda central del sub-sector si es libre.
+
+          // Primero se intenta colocar alrededor de la celda central si es libre
           if (maze[centerR][centerC] == 0) {
             for (int d = 0; d < 4; d++) {
               int nr = centerR + deltas[d][0];
               int nc = centerC + deltas[d][1];
-              if (isInside(nr, nc) && maze[nr][nc] == 1 && wallColors[nr][nc] == color(0, 0)) {
-                wallColors[nr][nc] = color(random(255), random(255), random(255));
+              if (isInside(nr, nc) && maze[nr][nc] == 1 && patchImages[nr][nc] == null) {
+                patchImages[nr][nc] = loadImage("https://picsum.photos/200.jpg");
                 totalPatchesPlaced++;
                 patchPlaced = true;
                 break;
               }
             }
           }
-          
-          // Si no se pudo colocar en el centro, buscar en un radio pequeño alrededor.
+
+          // Si no se logro colocar en la celda central, se busca en un radio cercano
           if (!patchPlaced) {
             int radius = 2;
             outer:
@@ -243,8 +306,8 @@ void detectColoredWalls() {
                   for (int d = 0; d < 4; d++) {
                     int nr = r + deltas[d][0];
                     int nc = c + deltas[d][1];
-                    if (isInside(nr, nc) && maze[nr][nc] == 1 && wallColors[nr][nc] == color(0, 0)) {
-                      wallColors[nr][nc] = color(random(255), random(255), random(255));
+                    if (isInside(nr, nc) && maze[nr][nc] == 1 && patchImages[nr][nc] == null) {
+                      patchImages[nr][nc] = loadImage("https://picsum.photos/200.jpg");
                       totalPatchesPlaced++;
                       patchPlaced = true;
                       break outer;
@@ -258,50 +321,54 @@ void detectColoredWalls() {
       }
     }
   }
-  println("[MAZE] placed=" + totalPatchesPlaced + " patches.");
+  println("[MAZE] placed=" + totalPatchesPlaced + " random-image patches.");
 }
 
-
-
-/** Dibuja el laberinto y, en caso de entrada/salida, añade animación */
+/**
+ * Dibujamos todas las celdas del laberinto en 3D. Las que son paredes
+ * se pintan con la textura correspondiente; las celdas libres verifican
+ * si son la entrada o la salida, dibujando un portal animado en cada caso.
+ */
 void drawMaze() {
   for (int r = 0; r < mazeRows; r++) {
     for (int c = 0; c < mazeCols; c++) {
       pushMatrix();
       float cx = (c + 0.5) * cellSize;
       float cz = (r + 0.5) * cellSize;
-      translate(cx, cellSize/2, cz);
+      translate(cx, cellSize / 2, cz);
 
       if (maze[r][c] == 1) {
-        // PARED
+        // Pared
         pushStyle();
         texturedBox(cellSize, wallImg);
         popStyle();
 
-        // Parche de color
-        if (wallColors[r][c] != color(0, 0)) {
+        // Verificacion de parche de imagen
+        if (patchImages[r][c] != null) {
           pushMatrix();
           pushStyle();
-          translate(0, 0, -cellSize/2 - 0.1);
-          fill(wallColors[r][c]);
+          // Se ajusta levemente la posicion en -Z para pegar la imagen en la pared frontal
+          translate(0, 0, -cellSize / 2 - 0.1);
           noStroke();
           float sz = cellSize * 0.3;
+
+          // Dibuja la imagen random en una cara de tamano reducido
           beginShape(QUADS);
-            vertex(-sz/2, -sz/2, 0);
-            vertex( sz/2, -sz/2, 0);
-            vertex( sz/2,  sz/2, 0);
-            vertex(-sz/2,  sz/2, 0);
+            texture(patchImages[r][c]);
+            vertex(-sz/2, -sz/2, 0, 0, 0);
+            vertex( sz/2, -sz/2, 0, patchImages[r][c].width, 0);
+            vertex( sz/2,  sz/2, 0, patchImages[r][c].width, patchImages[r][c].height);
+            vertex(-sz/2,  sz/2, 0, 0, patchImages[r][c].height);
           endShape();
+
           popStyle();
           popMatrix();
         }
-      }
-      else {
-        // CELDA LIBRE: ¿Es entrada/salida?
+      } else {
+        // Celda libre: se comprueba si es la entrada o la salida para dibujar un portal
         if (r == entranceRow && c == entranceCol) {
           drawPortal(false);
-        }
-        else if (r == exitRow && c == exitCol) {
+        } else if (r == exitRow && c == exitCol) {
           drawPortal(true);
         }
       }
@@ -310,11 +377,18 @@ void drawMaze() {
   }
 }
 
-/** Dibuja una pared/caja con textura */
+/**
+ * Dibujamos una caja con la textura especificada, representando una pared
+ * en cada una de sus caras.
+ *
+ * @param size tamano de la cara (en pixeles)
+ * @param tex textura que se aplicara en cada cara del cubo
+ */
 void texturedBox(float size, PImage tex) {
   float half = size / 2;
   noFill();
   noStroke();
+
   // Cara frontal
   beginShape();
     texture(tex);
@@ -370,29 +444,35 @@ void texturedBox(float size, PImage tex) {
   endShape(CLOSE);
 }
 
-/** Dibuja la entrada/salida con su textura y una animación "tipo portal". */
+/**
+ * Dibujamos un "portal" de entrada o salida, con una textura distinta
+ * segun si se trata del punto de partida o de la meta del laberinto.
+ * Aplica un efecto de pulso y rotacion para simular un portal animado.
+ *
+ * @param isExit indica si se trata de la salida (true) o de la entrada (false)
+ */
 void drawPortal(boolean isExit) {
   pushStyle();
   pushMatrix();
-  
+
   if (!isExit) {
-    // Entrada => hacia -Z
+    // Entrada orientada hacia -Z
     translate(0, 0, -cellSize/2 + 1);
     texturedBox(cellSize, portalEntry);
     translate(0, 0, -0.5);
   } else {
-    // Salida => hacia +Z
+    // Salida orientada hacia +Z
     translate(0, 0, cellSize/2 - 1);
     texturedBox(cellSize, portalExit);
     translate(0, 0, 0.5);
   }
 
-  // Efecto de pulso
+  // Efecto de pulso dinamico
   float t = millis() * 0.01;
   float scaleAmt = 1 + 0.3 * sin(t);
   float rad = cellSize * 0.6 * scaleAmt;
 
-  // Rotamos para dibujar el portal “mirando” al jugador (en Y)
+  // Se gira para quedar frente al jugador
   rotateX(HALF_PI);
 
   noFill();
