@@ -5,16 +5,14 @@
  * y la visualización de las distintas pantallas (menús, laberinto, resultados, etc.).
  *
  * El juego se divide en varios estados:
- * <ul>
- *   <li>0 = Menu principal</li>
- *   <li>1 = Seleccion de nivel</li>
- *   <li>2 = Ingreso de nombre</li>
- *   <li>3 = Jugando</li>
- *   <li>4 = Pantalla de fin (mostrar tiempo)</li>
- *   <li>5 = Resultados</li>
- *   <li>6 = Cargando</li>
- *   <li>7 = Instrucciones</li>
- * </ul>
+ *   0 = Menu principal
+ *   1 = Seleccion de nivel
+ *   2 = Ingreso de nombre
+ *   3 = Jugando
+ *   4 = Pantalla de fin (mostrar tiempo)
+ *   5 = Resultados
+ *   6 = Cargando
+ *   7 = Instrucciones
  *
  * El sistema tambien maneja el cronometro durante la partida, la deteccion de victoria
  * y la transicion entre pantallas de manera ordenada.
@@ -197,6 +195,10 @@ void drawFinishTime() {
  */
 void resetGame() {
   hasWon = false;
+  up    = false;
+  down  = false;
+  strafeLeft  = false;
+  strafeRight = false;
   println("[RESET] setupMaze + resetPlayer");
   setupMaze();
   resetPlayer();

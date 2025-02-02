@@ -107,13 +107,13 @@ void drawSelectLevelMenu() {
 
     // Niveles con distintas dificultades
     float byF = 200;
-    drawModernButton(bx, byF, bw, bh, "Fácil! 15x15 (Para pasar el rato!)");
+    drawModernButton(bx, byF, bw, bh, "Fácil! 5x5 (Para pasar el rato!)");
 
     float byM = 300;
-    drawModernButton(bx, byM, bw, bh, "Medio: 25x25 (Para jugar con paciencia!)");
+    drawModernButton(bx, byM, bw, bh, "Medio: 15x15 (Para jugar con paciencia!)");
 
     float byD = 400;
-    drawModernButton(bx, byD, bw, bh, "Difícil: 35x35 (Solo Para Valientes!)");
+    drawModernButton(bx, byD, bw, bh, "Difícil: 25x25 (Solo Para Valientes!)");
   popStyle();
 }
 
