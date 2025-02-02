@@ -1,6 +1,6 @@
 /**
  * Alumno: Bryan Enrique Garay Benavidez
- * Este es el archivo principal del proyecto, Laberinto3D.pde contiene tanto las variables globales como las funciones principales 
+ * Este es el archivo principal del proyecto, Laberinto3D.pde contiene tanto las variables globales como las funciones principales
  * que gestionan el flujo del juego, la configuración de la ventana, la carga de texturas
  * y la visualización de las distintas pantallas (menús, laberinto, resultados, etc.).
  *
@@ -107,47 +107,47 @@ void draw() {
   }
 
   switch (gameState) {
-    case 0: // Menu principal
-    case 1: // Seleccion de nivel
-    case 2: // Ingreso de nombre
-    case 5: // Pantalla de resultados
-    case 7: // Instrucciones
-      // Se utiliza renderizado 2D para estos estados
-      hint(DISABLE_DEPTH_TEST);
-      camera();
-      drawUI();
-      hint(ENABLE_DEPTH_TEST);
-      break;
+  case 0: // Menu principal
+  case 1: // Seleccion de nivel
+  case 2: // Ingreso de nombre
+  case 5: // Pantalla de resultados
+  case 7: // Instrucciones
+    // Se utiliza renderizado 2D para estos estados
+    hint(DISABLE_DEPTH_TEST);
+    camera();
+    drawUI();
+    hint(ENABLE_DEPTH_TEST);
+    break;
 
-    case 3: // Laberinto en 3D
-      setupCamera();
-      lights();
-      if (!hasWon) {
-        updatePlayer();
-        checkWinCondition();
-      } else {
-        // Al detectar victoria, mide el tiempo final y pasa a la etapa de presentacion
-        gameState = 4;
-        finalTime = millis() - startTime;
-        showTimeStart = millis();
-        println("[GAME] Jugador gano en " + finalTime + "ms");
-      }
-      drawMaze();
-      break;
+  case 3: // Laberinto en 3D
+    setupCamera();
+    lights();
+    if (!hasWon) {
+      updatePlayer();
+      checkWinCondition();
+    } else {
+      // Al detectar victoria, mide el tiempo final y pasa a la etapa de presentacion
+      gameState = 4;
+      finalTime = millis() - startTime;
+      showTimeStart = millis();
+      println("[GAME] Jugador gano en " + finalTime + "ms");
+    }
+    drawMaze();
+    break;
 
-    case 4: // Vista final con el tiempo logrado
-      hint(DISABLE_DEPTH_TEST);
-      camera();
-      drawFinishTime();
-      hint(ENABLE_DEPTH_TEST);
-      break;
+  case 4: // Vista final con el tiempo logrado
+    hint(DISABLE_DEPTH_TEST);
+    camera();
+    drawFinishTime();
+    hint(ENABLE_DEPTH_TEST);
+    break;
 
-    case 6: // Pantalla de carga con animacion
-      hint(DISABLE_DEPTH_TEST);
-      camera();
-      drawLoadingScreen();
-      hint(ENABLE_DEPTH_TEST);
-      break;
+  case 6: // Pantalla de carga con animacion
+    hint(DISABLE_DEPTH_TEST);
+    camera();
+    drawLoadingScreen();
+    hint(ENABLE_DEPTH_TEST);
+    break;
   }
 }
 
@@ -165,7 +165,7 @@ void setupCamera() {
 
 /**
  * Una vez que el jugador gana, se muestra en pantalla el tiempo final
- * y se espera un periodo determinado (showTimeDuration). 
+ * y se espera un periodo determinado (showTimeDuration).
  * Pasado ese intervalo, se registra el nuevo puntaje, se reinicia el juego
  * y se regresa al menu principal.
  */
@@ -181,12 +181,11 @@ void drawFinishTime() {
   popStyle();
 
   if (elapsed > showTimeDuration) {
-    println("[FINISH] Guardando score => " 
-            + playerName + ", lvl=" + selectedLevel + ", tiempo=" + finalTime);
+    println("[FINISH] Guardando score => "
+      + playerName + ", lvl=" + selectedLevel + ", tiempo=" + finalTime);
     saveScoreForLevel(playerName, finalTime, selectedLevel);
 
     hasWon = false;
-    resetGame();
     gameState = 0;
     println("[FINISH] Volvemos al Menu (gameState=0)");
   }
@@ -238,7 +237,7 @@ void drawLoadingScreen() {
   textSize(30);
   text("CARGANDO...", width / 2, height / 2 - 100);
 
-  // Se dibuja un cuadrado rotando en el centro
+  // Figura rotando
   pushMatrix();
   translate(width / 2, height / 2, 0);
   rotateZ(radians(elapsed * 0.2));
@@ -247,7 +246,21 @@ void drawLoadingScreen() {
   rectMode(CENTER);
   rect(0, 0, 100, 100);
   popMatrix();
+  popStyle();
 
+  // Instrucciones mínimas con estilo aislado
+  pushStyle();
+  textAlign(CENTER, CENTER);
+  fill(255);            // Texto en negro
+  textSize(22);       // Tamaño de fuente más grande
+  float instructionsY = (height / 2) + 150;  // 100 px más abajo
+  text(
+    "Controles:\n" +
+    "• Flechas: ↑ Adelante, ↓ Atras, ← Izq, → Der\n" +
+    "• E: Girar camara a la izquierda\n" +
+    "• Q: Girar camara a la derecha",
+    width / 2, instructionsY
+  );
   popStyle();
 
   // Al cumplirse el tiempo de carga, inicializa laberinto y jugador

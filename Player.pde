@@ -46,10 +46,22 @@ void updatePlayer() {
   float perpZ = -sin(playerAngle);
 
   // Movimientos basicos (adelante, atras, strafe)
-  if (up)          { playerPos.x += dirX * playerSpeed;   playerPos.z += dirZ * playerSpeed; }
-  if (down)        { playerPos.x -= dirX * playerSpeed;   playerPos.z -= dirZ * playerSpeed; }
-  if (strafeLeft)  { playerPos.x += perpX * playerSpeed;  playerPos.z += perpZ * playerSpeed; }
-  if (strafeRight) { playerPos.x -= perpX * playerSpeed;  playerPos.z -= perpZ * playerSpeed; }
+  if (up) {
+    playerPos.x += dirX * playerSpeed;
+    playerPos.z += dirZ * playerSpeed;
+  }
+  if (down) {
+    playerPos.x -= dirX * playerSpeed;
+    playerPos.z -= dirZ * playerSpeed;
+  }
+  if (strafeLeft) {
+    playerPos.x += perpX * playerSpeed;
+    playerPos.z += perpZ * playerSpeed;
+  }
+  if (strafeRight) {
+    playerPos.x -= perpX * playerSpeed;
+    playerPos.z -= perpZ * playerSpeed;
+  }
 
   // Chequeo de colisiones con paredes
   if (checkCollision()) {
@@ -58,8 +70,8 @@ void updatePlayer() {
 
   // Ajusta la camara para enfocarse en el jugador
   camera(playerPos.x, playerPos.y, playerPos.z,
-         playerPos.x + dirX * 50, playerPos.y, playerPos.z + dirZ * 50,
-         0, 1, 0);
+    playerPos.x + dirX * 50, playerPos.y, playerPos.z + dirZ * 50,
+    0, 1, 0);
 }
 
 /**
@@ -102,7 +114,7 @@ void displayWinMessage() {
   int elapsed = millis() - winStartTime;
   if (elapsed < winDuration) {
     hint(DISABLE_DEPTH_TEST);
-    camera(); 
+    camera();
     textAlign(CENTER, CENTER);
 
     pushStyle();
@@ -118,7 +130,7 @@ void displayWinMessage() {
 }
 
 /**
- * Determinamos si existe colision entre el jugador y las paredes o si se sale del limite.
+ * Determina si existe colision entre el jugador y las paredes o si se sale del limite.
  * Bloquea ademas la celda de entrada, impidiendo que el jugador retroceda a ella.
  *
  * @return true si se ha producido una colision o esta fuera de limites
